@@ -33,7 +33,7 @@ class GameState:
 	self.kick_price = 900 # At this balance your game ends
 	path, dirs, files = os.walk("/home/illya/Trader/src/images/specgrams").next()
 	self.max_frames = len(files)
-	self.frame = random.randint(0, self.max_frames-5000)
+	self.frame = random.randint(0, self.max_frames-10000)
 	with open("/home/illya/Trader/src/newvector.txt") as f:
     	    self.prices = map(float, f)
 
@@ -99,7 +99,7 @@ class GameState:
         if (isCrash or isOutOfFrames):
             terminal = True
             self.__init__()
-        if isCraash:
+        if isCrash:
 	    reward = -1
 	    #If we've ran out of frames, it's not networks fault
 
