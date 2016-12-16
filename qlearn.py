@@ -8,7 +8,7 @@ from skimage.transform import rotate
 from skimage.viewer import ImageViewer
 import sys
 sys.path.append("game/")
-import wrapped_flappy_bird as game
+import trader_game as game
 import random
 import numpy as np
 from collections import deque
@@ -22,12 +22,12 @@ from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.optimizers import SGD , Adam
 
-GAME = 'bird' # the name of the game being played for log files
+GAME = 'trader' # the name of the game being played for log files
 CONFIG = 'nothreshold'
 ACTIONS = 3 # number of valid actions
 GAMMA = 0.99 # decay rate of past observations
 OBSERVATION = 3200. # timesteps to observe before training
-EXPLORE = 3000000. # frames over which to anneal epsilon
+EXPLORE = 500000. # frames over which to anneal epsilon
 FINAL_EPSILON = 0.0001 # final value of epsilon
 INITIAL_EPSILON = 0.1 # starting value of epsilon
 REPLAY_MEMORY = 50000 # number of previous transitions to remember
@@ -50,7 +50,7 @@ def buildmodel():
     model.add(Flatten())
     model.add(Dense(512, init=lambda shape, name: normal(shape, scale=0.01, name=name)))
     model.add(Activation('relu'))
-    model.add(Dense(2,init=lambda shape, name: normal(shape, scale=0.01, name=name)))
+    model.add(Dense(3,init=lambda shape, name: normal(shape, scale=0.01, name=name)))
    
     adam = Adam(lr=1e-6)
     model.compile(loss='mse',optimizer=adam)
@@ -132,21 +132,24 @@ def trainNetwork(model,args):
         if t > OBSERVE:
             #sample a minibatch to train on
             minibatch = random.sample(D, BATCH)
+	    #print (minibatch)
 
             inputs = np.zeros((BATCH, s_t.shape[1], s_t.shape[2], s_t.shape[3]))   #32, 80, 80, 4
-            targets = np.zeros((inputs.shape[0], ACTIONS))                         #32, 2
-
+            targets = np.zeros((inputs.shape[0],ACTIONS ))                         #32, 2
+	    #How it works and why it is ACTIONS not just 2?
             #Now we do the experience replay
             for i in range(0, len(minibatch)):
-                state_t = minibatch[i][0]
-                action_t = minibatch[i][1]   #This is action index
-                reward_t = minibatch[i][2]
-                state_t1 = minibatch[i][3]
-                terminal = minibatch[i][4]
+                state_t = minibatch[i][0]   #big array gagin
+                action_t = minibatch[i][1]   #This is action index 0 or 1 or 2
+                reward_t = minibatch[i][2] #0 or 1 or -1
+                state_t1 = minibatch[i][3] #big array
+                terminal = minibatch[i][4] #Fale/true
                 # if terminated, only equals reward
 
                 inputs[i:i + 1] = state_t    #I saved down s_t
-
+		
+		print (targets[i])
+		print (model.predict(state_t))
                 targets[i] = model.predict(state_t)  # Hitting each buttom probability
                 Q_sa = model.predict(state_t1)
 
