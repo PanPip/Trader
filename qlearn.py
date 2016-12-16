@@ -24,7 +24,7 @@ from keras.optimizers import SGD , Adam
 
 GAME = 'bird' # the name of the game being played for log files
 CONFIG = 'nothreshold'
-ACTIONS = 2 # number of valid actions
+ACTIONS = 3 # number of valid actions
 GAMMA = 0.99 # decay rate of past observations
 OBSERVATION = 3200. # timesteps to observe before training
 EXPLORE = 3000000. # frames over which to anneal epsilon
