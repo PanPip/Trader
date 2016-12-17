@@ -9,9 +9,12 @@ from pygame.locals import *
 
 
 #Trading on second graph
-FPS = 30 # Or, may be faster?
-SCREENWIDTH  = 600
-SCREENHEIGHT = 1000
+FPS =60 # Or, may be faster?
+SCREENWIDTH  = 13
+SCREENHEIGHT = 257
+BLUE =  (  0,   0, 255) # for line indicators drawing
+GREEN = (  0, 255,   0)
+RED =   (255,   0,   0)
 
 pygame.init()
 FPSCLOCK = pygame.time.Clock()
@@ -23,17 +26,18 @@ pygame.display.set_caption('Trader')
 class GameState:
     def __init__(self):
 	self.money = 1000 # actual money
-	self.money_i = 0 # how much order is worth (for kicking a trader)
+	#self.money_i = 0 # how much order is worth (for kicking a trader)
 	self.multiplyer = 1000 # 1:100 (Not used in lite version)
 	self.orderprice = 0.1 #fixed price for order
 	self.order = 0 # -1 :currently sell order 0 : currently no orders 1: currently buy order
 	self.order_price = 0 #price at which order was opened
 	self.spread = 0.0001 #obviously, spread value
-        self.score =  0 #Not shure if needed yet
+        #self.score =  0 #Not shure if needed yet
 	self.kick_price = 900 # At this balance your game ends
-	path, dirs, files = os.walk("/home/illya/Trader/src/images/specgrams").next()
-	self.max_frames = len(files)
-	self.frame = random.randint(0, self.max_frames-10000)
+	#path, dirs, files = os.walk("/home/illya/Trader/src/images/specgrams").next()
+	#self.max_frames = len(files)
+	self.max_frames = 20000 #Just for now
+	self.frame = random.randint(1024, self.max_frames-10000)
 	with open("/home/illya/Trader/src/newvector.txt") as f:
     	    self.prices = map(float, f)
 
@@ -96,43 +100,59 @@ class GameState:
 
 	isOutOfFrames = (self.frame + 2 > self.max_frames)
 
-        if (isCrash or isOutOfFrames):
+        if isCrash:
             terminal = True
             self.__init__()
-        if isCrash:
 	    reward = -1
 	    #If we've ran out of frames, it's not networks fault
 
+	if isOutOfFrames:
+	    self.frame = random.randint(1024, self.max_frames-10000)
+
         # draw images
-	IMAGE_PATH = '/home/illya/Trader/src/images/specgrams/img' + str(1024 + self.frame) + '.png'
+	IMAGE_PATH = '/home/illya/Trader/src/images/newspecgrams/img' + str(self.frame) + '.png'
 	current_screen = pygame.image.load(IMAGE_PATH).convert()
         SCREEN.blit(current_screen, (0,0)) # draws one image over another
 
-        showScore(self)
+        showState(self)
 
         image_data = pygame.surfarray.array3d(pygame.display.get_surface())
+
 	#Updating
-        pygame.display.update()
+        pygame.display.update() # Do we need it?
         #print ("FPS" , FPSCLOCK.get_fps())
 	FPSCLOCK.tick(FPS)
 	self.frame += 1
-        return image_data, reward, terminal
+	ac = self.money
+        return image_data, reward, terminal, ac # did this to know, what's the progress
+
 
 
 #Need to be calibrated - so doesn't overlay needed information
-def showScore(self):
+#Now this function also tells player the state he is ight now by colour line in low pixel row
+#And doesn't tell money anymore - at this size it won't be seen either way
+def showState(self):
 
-    myfont = pygame.font.SysFont("monospace", 15)
-    if self.order == -1:
-	buf = 'Sell'
-    if self.order == 0:
-	buf = 'None'
-    if self.order == 1:
-	buf = 'Buy'
+    if self.order == -1: #green indicator
+	pygame.draw.line(SCREEN, GREEN, [0, 256], [12, 256], 1) #Numeration from 0, so...
+    if self.order == 0: # red indicator
+	pygame.draw.line(SCREEN, RED, [0, 256], [12, 256], 1)
+    if self.order == 1: # blue indicator
+	pygame.draw.line(SCREEN, BLUE, [0, 256], [12, 256], 1)
 	
-    score = 'Frame: ' +str(self.frame)+  ' Money: ' + str(self.money) + ' Current order: ' + buf
-    label = myfont.render(score, 1, (0,0,0))
-    SCREEN.blit(label, (10, 10))
+    #score = 'Frame: ' +str(self.frame)+  ' Money: ' + str(self.money) + ' Current order: ' + buf
+    #label = myfont.render(score, 1, (0,0,0))
+    #SCREEN.blit(label, (10, 10))
+
+#Implemented so the network can see in which state it is right now
+
+
+
+
+
+
+
+
 
 
 

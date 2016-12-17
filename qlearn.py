@@ -22,26 +22,30 @@ from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.optimizers import SGD , Adam
 
+#Initializing constants
+
 GAME = 'trader' # the name of the game being played for log files
 CONFIG = 'nothreshold'
 ACTIONS = 3 # number of valid actions
 GAMMA = 0.99 # decay rate of past observations
 OBSERVATION = 3200. # timesteps to observe before training
-EXPLORE = 500000. # frames over which to anneal epsilon
+EXPLORE = 1000000. # frames over which to anneal epsilon
 FINAL_EPSILON = 0.0001 # final value of epsilon
 INITIAL_EPSILON = 0.1 # starting value of epsilon
 REPLAY_MEMORY = 50000 # number of previous transitions to remember
 BATCH = 32 # size of minibatch
 FRAME_PER_ACTION = 1
 
-img_rows , img_cols = 80, 80
-#Convert image into Black and white
-img_channels = 4 #We stack 4 frames
+img_rows , img_cols = 257, 13
+#Convert image into Red Green Blue
+img_channels = 3 #We stack three images. Each representig a colour
+
+#Building out neural network. It is the example of DeepMind neural network
 
 def buildmodel():
     print("Now we build the model")
-    model = Sequential()
-    model.add(Convolution2D(32, 8, 8, subsample=(4,4),init=lambda shape, name: normal(shape, scale=0.01, name=name), border_mode='same',input_shape=(img_channels,img_rows,img_cols)))
+    model = Sequential() # A linear stack of layers
+    model.add(Convolution2D(32, 8, 8, subsample=(4,4),init=lambda shape, name: normal(shape, scale=0.01, name=name), border_mode='same',input_shape=(img_channels,img_rows,img_cols))) 
     model.add(Activation('relu'))
     model.add(Convolution2D(64, 4, 4, subsample=(2,2),init=lambda shape, name: normal(shape, scale=0.01, name=name), border_mode='same'))
     model.add(Activation('relu'))
@@ -57,6 +61,7 @@ def buildmodel():
     print("We finish building the model")
     return model
 
+
 def trainNetwork(model,args):
     # open up a game state to communicate with emulator
     game_state = game.GameState()
@@ -66,17 +71,21 @@ def trainNetwork(model,args):
 
     # get the first state by doing nothing and preprocess the image to 80x80x4
     do_nothing = np.zeros(ACTIONS)
-    do_nothing[0] = 1
-    x_t, r_0, terminal = game_state.frame_step(do_nothing)
+    do_nothing[1] = 1 #Because in our game this action is doing nothing
+    x_t, r_0, terminal, ac= game_state.frame_step(do_nothing)
 
-    x_t = skimage.color.rgb2gray(x_t)
-    x_t = skimage.transform.resize(x_t,(80,80))
-    x_t = skimage.exposure.rescale_intensity(x_t,out_range=(0,255))
+    #x_t = skimage.color.rgb2gray(x_t)
+    #x_t = skimage.transform.resize(x_t,(80,80)) Not transforming for now
+    #x_t = skimage.exposure.rescale_intensity(x_t,out_range=(0,255))
 
-    s_t = np.stack((x_t, x_t, x_t, x_t), axis=0)
+    x_g = x_t[:,:,1]
+    x_r = x_t[:,:,0]
+    x_b = x_t[:,:,2]
+
+    s_t = np.stack((x_r, x_g, x_b), axis=0)
 
     #In Keras, need to reshape
-    s_t = s_t.reshape(1, s_t.shape[0], s_t.shape[1], s_t.shape[2])
+    s_t = s_t.reshape(1, s_t.shape[0], s_t.shape[2], s_t.shape[1])
 
     if args['mode'] == 'Run':
         OBSERVE = 999999999    #We keep observe, never train
@@ -104,7 +113,7 @@ def trainNetwork(model,args):
                 action_index = random.randrange(ACTIONS)
                 a_t[action_index] = 1
             else:
-                q = model.predict(s_t)       #input a stack of 4 images, get the prediction
+                q = model.predict(s_t)       #input a stack of 3 images, get the prediction
                 max_Q = np.argmax(q)
                 action_index = max_Q
                 a_t[max_Q] = 1
@@ -114,14 +123,19 @@ def trainNetwork(model,args):
             epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
 
         #run the selected action and observed next state and reward
-        x_t1_colored, r_t, terminal = game_state.frame_step(a_t)
+        x_t1, r_t, terminal ,ac = game_state.frame_step(a_t)
 
-        x_t1 = skimage.color.rgb2gray(x_t1_colored)
-        x_t1 = skimage.transform.resize(x_t1,(80,80))
-        x_t1 = skimage.exposure.rescale_intensity(x_t1, out_range=(0, 255))
+        x_g1 = x_t1[:,:,1]
+        x_r1 = x_t1[:,:,0]
+        x_b1 = x_t1[:,:,2]
 
-        x_t1 = x_t1.reshape(1, 1, x_t1.shape[0], x_t1.shape[1])
-        s_t1 = np.append(x_t1, s_t[:, :3, :, :], axis=1)
+        s_t1 = np.stack((x_r1, x_g1, x_b1), axis=0)
+
+	s_t1 = s_t1.reshape(1, s_t1.shape[0], s_t1.shape[2], s_t1.shape[1])
+
+	#x_t1 = skimage.color.rgb2gray(x_t1_colored)
+        #x_t1 = skimage.transform.resize(x_t1,(80,80))
+        #x_t1 = skimage.exposure.rescale_intensity(x_t1, out_range=(0, 255))
 
         # store the transition in D
         D.append((s_t, action_index, r_t, s_t1, terminal))
@@ -132,7 +146,7 @@ def trainNetwork(model,args):
         if t > OBSERVE:
             #sample a minibatch to train on
             minibatch = random.sample(D, BATCH)
-	    #print (minibatch)
+
 
             inputs = np.zeros((BATCH, s_t.shape[1], s_t.shape[2], s_t.shape[3]))   #32, 80, 80, 4
             targets = np.zeros((inputs.shape[0],ACTIONS ))                         #32, 2
@@ -148,8 +162,6 @@ def trainNetwork(model,args):
 
                 inputs[i:i + 1] = state_t    #I saved down s_t
 		
-		print (targets[i])
-		print (model.predict(state_t))
                 targets[i] = model.predict(state_t)  # Hitting each buttom probability
                 Q_sa = model.predict(state_t1)
 
@@ -182,7 +194,7 @@ def trainNetwork(model,args):
 
         print("TIMESTEP", t, "/ STATE", state, \
             "/ EPSILON", epsilon, "/ ACTION", action_index, "/ REWARD", r_t, \
-            "/ Q_MAX " , np.max(Q_sa), "/ Loss ", loss)
+            "/ Q_MAX " , np.max(Q_sa), "/ Loss ", loss, "/ Cash: ", ac)
 
     print("Episode finished!")
     print("************************")
